@@ -156,6 +156,69 @@
             color: #2c2c2c;
             z-index: 1;
         }
+
+        .timer-container {
+            margin: 20px auto;
+            width: 90%;
+            max-width: 300px;
+        }
+
+        #timer {
+            font-size: 3.5em;
+            margin: 20px 0;
+            font-family: 'Noto Serif JP', serif;
+            font-weight: 200;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #eee;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            position: absolute;
+            height: 100%;
+            width: 0%;
+            background: #2c2c2c;
+            transition: width 0.1s linear;
+        }
+
+        #currentPour {
+            font-size: 1.5em;
+            margin: 20px 0 10px;
+            font-weight: 300;
+        }
+
+        #targetGrams {
+            font-size: 1.2em;
+            margin: 10px 0 20px;
+            font-weight: 300;
+            color: #666;
+        }
+
+        /* Mobile optimizations */
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+
+            .coffee-illustration {
+                width: 150px;
+                height: 150px;
+            }
+
+            #timer {
+                font-size: 3em;
+            }
+
+            select, button {
+                width: 90%;
+                margin: 10px auto;
+            }
+        }
     </style>
 </head>
 <body>
@@ -190,12 +253,11 @@
         <option value="perry">Perry 13g</option>
     </select>
 
-    <button id="testSoundButton" style="font-size: 0.8em; width: auto; margin: 5px;">Test Sound</button>
-
     <div class="timer-container">
-        <div class="timer-circle"></div>
-        <div class="timer-progress"></div>
         <div id="timer">00:00</div>
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
     </div>
 
     <div id="currentPour">Select a recipe</div>
@@ -240,30 +302,35 @@
         let startTime = 0;
         let currentPourIndex = 0;
         let isRunning = false;
+        let audioContext = null;
 
         const startButton = document.getElementById('startButton');
         const recipeSelect = document.getElementById('recipeSelect');
 
-        // Create a simple beep function
+        // Initialize audio context on first user interaction
+        document.addEventListener('click', function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            document.removeEventListener('click', initAudio);
+        }, { once: true });
+
         function playSound() {
-            const context = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
+            if (!audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
             
             oscillator.connect(gain);
-            gain.connect(context.destination);
+            gain.connect(audioContext.destination);
             
             oscillator.type = 'sine';
             oscillator.frequency.value = 440;
             gain.gain.value = 0.1;
             
-            oscillator.start(0);
-            
-            // Stop after 0.1 seconds
-            setTimeout(() => {
-                oscillator.stop();
-                context.close();
-            }, 100);
+            oscillator.start();
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.1);
+            oscillator.stop(audioContext.currentTime + 0.1);
         }
 
         function updateTimer() {
@@ -272,6 +339,7 @@
             const totalSeconds = Math.floor(elapsedMs / 1000);
             const minutes = Math.floor(totalSeconds / 60);
             const seconds = totalSeconds % 60;
+            
             document.getElementById('timer').textContent = 
                 `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
@@ -280,10 +348,8 @@
                 const nextPour = recipes[recipeSelect.value].pours[currentPourIndex + 1];
                 const pourDuration = nextPour.timeInSeconds - currentPour.timeInSeconds;
                 const pourElapsed = totalSeconds - currentPour.timeInSeconds;
-                const progress = Math.min(pourElapsed / pourDuration, 1);
-                const degrees = progress * 360;
-                document.querySelector('.timer-progress').style.transform = 
-                    `rotate(${degrees - 45}deg) scale(0.99)`;
+                const progress = Math.min(pourElapsed / pourDuration, 1) * 100;
+                document.querySelector('.progress-fill').style.width = `${progress}%`;
             }
         }
 
@@ -310,7 +376,6 @@
         function startTimer() {
             playSound();
             
-            // Countdown beeps
             let count = 3;
             const countdownInterval = setInterval(() => {
                 count--;
@@ -326,7 +391,7 @@
         function startTimerNow() {
             isRunning = true;
             startTime = Date.now();
-            startButton.textContent = 'Stop';
+            document.getElementById('startButton').textContent = 'Stop';
             currentPourIndex = 0;
             updatePourInfo();
             
@@ -339,12 +404,12 @@
         function stopTimer() {
             clearInterval(timer);
             isRunning = false;
-            startButton.textContent = 'Start';
+            document.getElementById('startButton').textContent = 'Start';
             startTime = 0;
             currentPourIndex = 0;
             updateTimer();
             updatePourInfo();
-            document.querySelector('.timer-progress').style.transform = 'rotate(-45deg)';
+            document.querySelector('.progress-fill').style.width = '0%';
         }
 
         startButton.addEventListener('click', () => {
