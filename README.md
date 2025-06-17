@@ -1,14 +1,13 @@
 # Japan
 
-A place where some things seem lovable
-and also not
+The rising
+sun
 
-* food
-* people
-* peace
-Also its so great
+* Tokyo
+* Kyoto
+Looks cool
 
 ## Ideas
 
 Bye
-Bye
+Bye !
